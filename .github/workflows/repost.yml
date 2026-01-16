@@ -5,6 +5,9 @@ on:
     - cron: "22 * * * *"  # iedere uur op minuut 22 (UTC)
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   repost:
     runs-on: ubuntu-latest
