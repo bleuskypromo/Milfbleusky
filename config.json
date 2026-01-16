@@ -5,7 +5,7 @@
   "max_per_author_per_run": 5,
   "delay_seconds": 2,
 
-  "fetch_limit": 200,
+  "fetch_limit": 100,
 
   "overlap_minutes": 15,
   "fallback_hours_first_run": 3
