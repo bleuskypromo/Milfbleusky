@@ -1,8 +1,8 @@
-name: milfbleusky reposter (femdom-style)
+name: milfbleusky reposter
 
 on:
   schedule:
-    - cron: "22 * * * *"   # every hour at minute 22 (UTC)
+    - cron: "22 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -22,21 +22,21 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install dependencies
+      - name: Install deps
         run: pip install atproto
 
-      - name: Run reposter
+      - name: Run bot
         env:
           BSKY_USERNAME: ${{ secrets.BSKY_USERNAME }}
           BSKY_PASSWORD: ${{ secrets.BSKY_PASSWORD }}
         run: python -u repost.py
 
-      - name: Commit state files
+      - name: Commit state
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
-          git add reposted_milf.txt state_milf.json
-          git commit -m "Update milf reposter state" || echo "No changes"
+          git add reposted.txt state.json
+          git commit -m "Update reposter state" || echo "No changes"
 
-      - name: Push changes
+      - name: Push
         run: git push
