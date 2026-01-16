@@ -1,4 +1,4 @@
-name: milfbleusky reposter
+name: milfbleusky reposter (femdom-style)
 
 on:
   schedule:
@@ -29,14 +29,14 @@ jobs:
         env:
           BSKY_USERNAME: ${{ secrets.BSKY_USERNAME }}
           BSKY_PASSWORD: ${{ secrets.BSKY_PASSWORD }}
-        run: python repost.py
+        run: python -u repost.py
 
-      - name: Commit updated state
+      - name: Commit state files
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
-          git add state.json
-          git commit -m "Update repost state" || echo "No changes"
+          git add reposted_milf.txt state_milf.json
+          git commit -m "Update milf reposter state" || echo "No changes"
 
       - name: Push changes
         run: git push
