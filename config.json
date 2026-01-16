@@ -1,37 +1,12 @@
 {
-  "feeds": [
-    "https://bsky.app/profile/did:plc:jaka644beit3x4vmmg6yysw7/feed/aaablag6rrqxu",
-    "https://bsky.app/profile/did:plc:db645kt5coo7teuoxdjhq34x/feed/aaaggcffwsa3k",
-    "",
-    "",
-    ""
-  ],
-  "lists": [
-    "",
-    "",
-    "",
-    "",
-    ""
-  ],
-  "hashtags": ["milf", "nsfw", "hotwife", "cougar", "blonde"],
-  "single_post_uri": "https://bsky.app/profile/beautygroup.bsky.social/post/3mcildeh7cs2r",
-
-  "blocked_users": [
-    "spamaccount.bsky.social",
-    "did:plc:abc123...",
-    "https://bsky.app/profile/did:plc:mbmrdjswath6qc3sdpal5vqh/lists/3mcksmjmdtc2t"
-  ],
+  "feed": "https://bsky.app/profile/did:plc:jaka644beit3x4vmmg6yysw7/feed/aaamrj54kfflm",
 
   "max_total_per_run": 100,
-  "max_per_author_per_run": 3,
+  "max_per_author_per_run": 5,
   "delay_seconds": 2,
 
-  "fetch_limit_per_feed": 80,
-  "fetch_limit_per_list": 120,
-  "search_limit_per_tag": 80,
+  "fetch_limit": 200,
 
   "overlap_minutes": 15,
-  "fallback_hours_first_run": 3,
-
-  "state_max_uris": 8000
+  "fallback_hours_first_run": 3
 }
