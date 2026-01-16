@@ -1,16 +1,37 @@
 {
-  "feeds": ["FEED1", "FEED2", "FEED3", "FEED4", "FEED5"],
-  "lists": ["LIST1", "LIST2", "LIST3", "LIST4", "LIST5"],
-  "hashtags": ["tag1", "tag2", "tag3", "tag4", "tag5"],
+  "feeds": [
+    "https://bsky.app/profile/someone.bsky.social/feed/abc123",
+    "",
+    "",
+    "",
+    ""
+  ],
+  "lists": [
+    "https://bsky.app/profile/someone.bsky.social/lists/3lxyz456",
+    "",
+    "",
+    "",
+    ""
+  ],
+  "hashtags": ["milf", "nsfw", "hotwife", "cougar", "blonde"],
   "single_post_uri": "at://did:plc:xxxx/app.bsky.feed.post/xxxx",
+
+  "blocked_users": [
+    "spamaccount.bsky.social",
+    "did:plc:abc123...",
+    "https://bsky.app/profile/baduser.bsky.social"
+  ],
 
   "max_total_per_run": 100,
   "max_per_author_per_run": 3,
   "delay_seconds": 2,
 
-  "fetch_limit_per_feed": 50,
-  "fetch_limit_per_list": 50,
-  "search_limit_per_tag": 50,
+  "fetch_limit_per_feed": 80,
+  "fetch_limit_per_list": 120,
+  "search_limit_per_tag": 80,
+
+  "overlap_minutes": 15,
+  "fallback_hours_first_run": 3,
 
   "state_max_uris": 8000
 }
