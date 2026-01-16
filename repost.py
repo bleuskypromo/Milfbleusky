@@ -172,6 +172,10 @@ def post_time(item) -> datetime:
 def do_repost(c: Client, uri: str, cid: str) -> bool:
     try:
         c.repost(uri=uri, cid=cid)
+        try:
+            c.like(uri=uri, cid=cid)
+        except Exception as e:
+            print(f"[WARN] like failed (ignored): {e}")
         return True
     except Exception as e:
         print(f"[WARN] repost failed: {e}")
