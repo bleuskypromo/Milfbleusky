@@ -1,5 +1,4 @@
 import os
-import re
 import json
 import time
 from typing import Set, Dict, Optional, List, Tuple
@@ -122,13 +121,11 @@ def is_repost_item(item) -> bool:
 
 def media_ok(record) -> bool:
     """
-    Only allow:
-      - images
-      - video-like embeds
+    Only allow photo/video posts.
     Reject:
       - text-only (no embed)
       - link-card-only (external)
-      - quote/record embeds (record / recordWithMedia)
+      - quote/record embeds (record / recordWithMedia) to keep it simple
     """
     e = getattr(record, "embed", None)
     if not e:
@@ -140,8 +137,7 @@ def media_ok(record) -> bool:
     if "app.bsky.embed.external" in et:
         return False
 
-    # Quote / record embeds -> reject (keeps it simple & avoids link/quote reposts)
-    # recordWithMedia may contain media but also references another record; treat as not allowed per your "simpel" goal.
+    # Quote / record embeds -> reject
     if "app.bsky.embed.record" in et or "app.bsky.embed.recordWithMedia" in et:
         return False
 
@@ -153,11 +149,10 @@ def media_ok(record) -> bool:
         except Exception:
             return True
 
-    # Some libs expose video/media attributes
+    # Video-ish
     if hasattr(e, "video") or hasattr(e, "media"):
         return True
 
-    # Unknown embed -> reject (safe)
     return False
 
 
@@ -169,7 +164,7 @@ def post_time(item) -> datetime:
 # ----------------------------
 # Actions
 # ----------------------------
-def do_repost(c: Client, uri: str, cid: str) -> bool:
+def do_repost_and_like(c: Client, uri: str, cid: str) -> bool:
     try:
         c.repost(uri=uri, cid=cid)
         try:
@@ -199,7 +194,9 @@ def main():
     max_per_user = int(cfg.get("max_per_author_per_run", 5))
     delay_seconds = float(cfg.get("delay_seconds", 2))
 
-    fetch_limit = int(cfg.get("fetch_limit", 200))  # how many feed items to look at
+    fetch_limit = int(cfg.get("fetch_limit", 100))
+    fetch_limit = max(1, min(fetch_limit, 100))  # API hard limit
+
     overlap_minutes = int(cfg.get("overlap_minutes", 15))
     fallback_hours = int(cfg.get("fallback_hours_first_run", 3))
 
@@ -278,8 +275,8 @@ def main():
 
         candidates.append((dt, uri, cid, author_did))
 
-    # Newest first
-    candidates.sort(key=lambda x: x[0], reverse=True)
+    # IMPORTANT: Oldest first so the newest ends up on top of your profile
+    candidates.sort(key=lambda x: x[0])
 
     # Repost with caps
     done = 0
@@ -290,12 +287,12 @@ def main():
         if per_user.get(author_did, 0) >= max_per_user:
             continue
 
-        ok = do_repost(c, uri, cid)
+        ok = do_repost_and_like(c, uri, cid)
         if ok:
             done += 1
             reposted.add(uri)
             per_user[author_did] = per_user.get(author_did, 0) + 1
-            print(f"[OK] reposted {uri}")
+            print(f"[OK] reposted+liked {uri}")
         else:
             print(f"[SKIP] failed {uri}")
 
