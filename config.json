@@ -1,1 +1,16 @@
+{
+  "feeds": ["FEED1", "FEED2", "FEED3", "FEED4", "FEED5"],
+  "lists": ["LIST1", "LIST2", "LIST3", "LIST4", "LIST5"],
+  "hashtags": ["tag1", "tag2", "tag3", "tag4", "tag5"],
+  "single_post_uri": "at://did:plc:xxxx/app.bsky.feed.post/xxxx",
 
+  "max_total_per_run": 100,
+  "max_per_author_per_run": 3,
+  "delay_seconds": 2,
+
+  "fetch_limit_per_feed": 50,
+  "fetch_limit_per_list": 50,
+  "search_limit_per_tag": 50,
+
+  "state_max_uris": 8000
+}
