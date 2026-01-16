@@ -13,13 +13,20 @@ STATE_PATH = "state.json"
 
 
 # -----------------------
-# JSON helpers
+# JSON helpers (robust)
 # -----------------------
 def load_json(path: str, default: Any) -> Any:
     if not os.path.exists(path):
         return default
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            content = f.read().strip()
+            if not content:
+                return default
+            return json.loads(content)
+    except Exception as e:
+        print(f"[WARN] Could not parse {path} ({e}). Using defaults.")
+        return default
 
 
 def save_json(path: str, data: Any) -> None:
@@ -78,7 +85,7 @@ def within_window(post: Dict[str, Any], start_ts: float, end_ts: float) -> bool:
 
 
 # -----------------------
-# URL-proof config normalization (feeds/lists)
+# URL-proof config normalization (feeds/lists/single post)
 # -----------------------
 def _extract_actor_and_rkey(url: str, segment: str) -> Optional[Tuple[str, str]]:
     """
@@ -175,6 +182,41 @@ def normalize_list_uris(client: Client, values: List[str]) -> List[str]:
     return out
 
 
+def normalize_post_uri(client: Client, value: str) -> str:
+    """
+    Accepts:
+      - at://did/app.bsky.feed.post/rkey
+      - https://bsky.app/profile/<actor>/post/<rkey>
+    Returns AT-URI or "" if not recognized.
+    """
+    if not isinstance(value, str):
+        return ""
+    v = value.strip()
+    if not v:
+        return ""
+
+    if v.startswith("at://"):
+        return v
+
+    lower = v.lower()
+    if "bsky.app/profile/" in lower:
+        try:
+            tail = v.split("bsky.app/profile/", 1)[1]
+            parts = [p for p in tail.split("/") if p]
+            # parts: [actor, "post", rkey]
+            if len(parts) >= 3 and parts[1].lower() == "post":
+                actor = parts[0]
+                rkey = parts[2]
+                did = resolve_actor_to_did(client, actor)
+                if did:
+                    return f"at://{did}/app.bsky.feed.post/{rkey}"
+        except Exception:
+            pass
+
+    print(f"[WARN] Unrecognized single_post_uri, skipping: {value}")
+    return ""
+
+
 # -----------------------
 # Blacklist (URL-proof)
 # -----------------------
@@ -216,8 +258,12 @@ def is_blocked(post: Dict[str, Any], blocked: set) -> bool:
 
 
 # -----------------------
-# Filters: only media, no reply, no repost, feeds/lists require #milf
-# URLs in text are allowed if media exists.
+# Filters:
+# - Only media (photo/video)
+# - No reply
+# - No repost (where detectable)
+# - Feeds/lists require #milf
+# - URL in text is allowed (as long as media exists)
 # -----------------------
 def is_reply(post: Dict[str, Any]) -> bool:
     record = post.get("record") or {}
@@ -303,19 +349,19 @@ def has_required_milf_tag(post: Dict[str, Any]) -> bool:
 
 
 def passes_content_filters(post: Dict[str, Any], feed_item_context: Optional[Dict[str, Any]]) -> bool:
-    # no reposts (detectable for feeds/lists)
+    # No reposts (detectable for feeds/lists)
     if feed_item_context and is_repost_reason(feed_item_context):
         return False
 
-    # no replies
+    # No replies
     if is_reply(post):
         return False
 
-    # feeds + lists ONLY: must contain #milf
+    # Feeds + lists only must have #milf (context exists for feed/list items)
     if feed_item_context and not has_required_milf_tag(post):
         return False
 
-    # media required; blocks link-only and text-only
+    # Must be media (photo/video); this blocks text-only and link-card-only
     if not embed_is_media_only(post):
         return False
 
@@ -392,7 +438,7 @@ def fetch_single_post(client: Client, uri: str) -> Optional[Dict[str, Any]]:
 
 
 # -----------------------
-# Repost cycle for single post (unrepost -> repost each run)
+# Single post cycle (unrepost -> repost each run)
 # -----------------------
 def extract_rkey_from_at_uri(at_uri: str) -> str:
     try:
@@ -445,7 +491,7 @@ def main() -> None:
     raw_feeds = norm_list(config.get("feeds", []))
     raw_lists = norm_list(config.get("lists", []))
     hashtags = norm_list(config.get("hashtags", []))
-    single_post_uri = (config.get("single_post_uri") or "").strip()
+    raw_single_post = (config.get("single_post_uri") or "").strip()
 
     blocked_users = normalize_blocked_users(config.get("blocked_users", []))
 
@@ -473,9 +519,10 @@ def main() -> None:
     client = Client()
     client.login(username, password)
 
-    # URL-proof normalization (resolve handle -> did when needed)
+    # URL-proof normalization (needs login for handle->did resolve)
     feeds = normalize_feed_uris(client, raw_feeds)
     lists = normalize_list_uris(client, raw_lists)
+    single_post_uri = normalize_post_uri(client, raw_single_post) if raw_single_post else ""
 
     end_ts = now_ts()
     if last_run_ts is None:
@@ -499,7 +546,7 @@ def main() -> None:
     # 1) Collect with context (context exists for feed/list items, None for hashtag results)
     collected: List[Tuple[Dict[str, Any], Optional[Dict[str, Any]]]] = []
 
-    # feeds
+    # Feeds
     for f in feeds:
         try:
             items = fetch_feed_items(client, f, fetch_limit_feed)
@@ -510,7 +557,7 @@ def main() -> None:
         except Exception as e:
             print(f"[WARN] feed fetch failed: {f} :: {e}")
 
-    # lists
+    # Lists
     for l in lists:
         try:
             items = fetch_list_items(client, l, fetch_limit_list)
@@ -521,7 +568,7 @@ def main() -> None:
         except Exception as e:
             print(f"[WARN] list fetch failed: {l} :: {e}")
 
-    # hashtags (no repost-reason context)
+    # Hashtags (no repost-reason context available)
     for t in hashtags:
         try:
             posts = fetch_hashtag_posts(client, t, search_limit_tag)
@@ -540,30 +587,24 @@ def main() -> None:
         if not uri or not cid:
             continue
 
-        # overlap window for everything
         if not within_window(p, start_ts, end_ts):
             continue
 
-        # already reposted (except single; handled separately)
         if uri in reposted_uris:
             continue
 
-        # blacklist
         if blocked_users and is_blocked(p, blocked_users):
             continue
 
-        # content filters
         if not passes_content_filters(p, ctx):
             continue
 
         by_uri[uri] = p
 
     candidates = list(by_uri.values())
-
-    # 3) Sort newest first
     candidates.sort(key=parse_created_at, reverse=True)
 
-    # 4) Per-author cap (applies to all sources)
+    # 3) Enforce per-author cap
     author_count = defaultdict(int)
     limited: List[Dict[str, Any]] = []
     take_limit = max(0, max_total - 1)  # reserve 1 slot for single post
@@ -578,21 +619,22 @@ def main() -> None:
         if author:
             author_count[author] += 1
 
-    # 5) Fetch single post + validate + inject at position 3
+    # 4) Fetch single post + validate + inject at position 3 (index 2)
     final_queue: List[Dict[str, Any]] = limited
-    single_post = None
+    single_post: Optional[Dict[str, Any]] = None
 
     if single_post_uri:
         single_post = fetch_single_post(client, single_post_uri)
         if not single_post:
-            print(f"[WARN] single post not found or fetch failed: {single_post_uri}")
+            print(f"[WARN] single post not found or fetch failed: {raw_single_post}")
 
     if single_post:
+        # Apply same safety filters to single post (except repost reason, since no ctx)
         if blocked_users and is_blocked(single_post, blocked_users):
             print("[WARN] Single post author is blocked — skipping single post")
             single_post = None
         elif not passes_content_filters(single_post, None):
-            print("[WARN] Single post does not meet media/no-reply/no-linkcard rules — skipping single post")
+            print("[WARN] Single post does not meet media/no-reply rules — skipping single post")
             single_post = None
 
     if single_post and get_uri(single_post) and get_cid(single_post):
@@ -604,7 +646,7 @@ def main() -> None:
 
     print(f"[INFO] Queue size: {len(final_queue)} (max_total={max_total})")
 
-    # 6) Execute reposts with delay
+    # 5) Execute reposts with delay
     newly_reposted: List[str] = []
     for i, p in enumerate(final_queue, start=1):
         uri = get_uri(p)
@@ -619,32 +661,4 @@ def main() -> None:
             author_handle = get_author_handle(p)
             print(f"[OK]  {i:02d} reposted: {uri}  (by {author_handle})")
             if is_single and repost_record_uri:
-                single_repost_record_uri = repost_record_uri
-            if not is_single:
-                newly_reposted.append(uri)
-        else:
-            print(f"[SKIP] {i:02d} {uri} :: {msg}")
-
-        time.sleep(delay_seconds)
-
-    # 7) Save state
-    for u in newly_reposted:
-        reposted_uris.add(u)
-
-    reposted_list = list(reposted_uris)
-    if len(reposted_list) > state_max_uris:
-        reposted_list = reposted_list[-state_max_uris:]
-
-    save_json(
-        STATE_PATH,
-        {
-            "reposted_uris": reposted_list,
-            "single_repost_record_uri": single_repost_record_uri,
-            "last_run_iso": ts_to_iso(end_ts),
-        },
-    )
-    print(f"[INFO] State saved. Total tracked: {len(reposted_list)}")
-
-
-if __name__ == "__main__":
-    main()
+                single_repost_record_uri = repost_r
