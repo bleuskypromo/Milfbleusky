@@ -2,7 +2,7 @@ name: milfbleusky reposter
 
 on:
   schedule:
-    - cron: "22 * * * *"  # iedere uur op minuut 22 (UTC)
+    - cron: "22 * * * *"   # every hour at minute 22 (UTC)
   workflow_dispatch:
 
 permissions:
@@ -12,7 +12,10 @@ jobs:
   repost:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -34,4 +37,6 @@ jobs:
           git config user.email "github-actions@github.com"
           git add state.json
           git commit -m "Update repost state" || echo "No changes"
-          git push
+
+      - name: Push changes
+        run: git push
