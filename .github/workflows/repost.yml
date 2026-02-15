@@ -1,11 +1,6 @@
-env:
-  WORKFLOWS_DISABLED: true
 
 name: milfbleusky reposter
 
-on:
-  schedule:
-    - cron: "22 * * * *"
   workflow_dispatch:
 
 permissions:
